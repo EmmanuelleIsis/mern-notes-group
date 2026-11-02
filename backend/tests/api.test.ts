@@ -78,3 +78,53 @@ test("another user cannot read, modify, or delete the owner's note", async () =>
     await other.delete(`/api/notes/${id}`).expect(401);
     await owner.get(`/api/notes/${id}`).expect(200);
 });
+
+test.each([
+    ["missing", {}],
+    ["empty", { title: "" }],
+    ["whitespace", { title: "   " }],
+    ["number", { title: 42 }],
+    ["null", { title: null }],
+    ["object", { title: { value: "Title" } }],
+])("POST rejects a %s title without saving a note", async (_label, body) => {
+    const client = request.agent(app);
+    await client.post("/api/users/signup").send(credentials).expect(201);
+    await client.post("/api/notes").send(body).expect(400);
+    const list = await client.get("/api/notes").expect(200);
+    expect(list.body).toEqual([]);
+});
+
+test.each([
+    ["missing", {}],
+    ["empty", { title: "" }],
+    ["whitespace", { title: "   " }],
+    ["number", { title: 42 }],
+    ["null", { title: null }],
+    ["object", { title: { value: "Title" } }],
+])("PATCH rejects a %s title and preserves the original note", async (_label, body) => {
+    const client = request.agent(app);
+    await client.post("/api/users/signup").send(credentials).expect(201);
+    const created = await client.post("/api/notes")
+        .send({ title: "Original", text: "Keep this text" }).expect(201);
+    const url = "/api/notes/" + created.body._id;
+    await client.patch(url).send(body).expect(400);
+    const unchanged = await client.get(url).expect(200);
+    expect(unchanged.body.title).toBe("Original");
+    expect(unchanged.body.text).toBe("Keep this text");
+});
+
+test("POST and PATCH trim titles before saving", async () => {
+    const client = request.agent(app);
+    await client.post("/api/users/signup").send(credentials).expect(201);
+    const created = await client.post("/api/notes")
+        .send({ title: "  Team note  ", text: "Shared work" }).expect(201);
+    expect(created.body.title).toBe("Team note");
+    const url = "/api/notes/" + created.body._id;
+    const saved = await client.get(url).expect(200);
+    expect(saved.body.title).toBe("Team note");
+    const updated = await client.patch(url)
+        .send({ title: "  Updated team note  ", text: "Shared work" }).expect(200);
+    expect(updated.body.title).toBe("Updated team note");
+    const savedAgain = await client.get(url).expect(200);
+    expect(savedAgain.body.title).toBe("Updated team note");
+});
