@@ -57,13 +57,13 @@ export const createNote: RequestHandler<unknown, unknown, CreateNoteBody, unknow
     try {
         assertIsDefined(authenticatedUserId);
 
-        if (!title) {
+        if (typeof title !== "string" || title.trim().length === 0) {
             throw createHttpError(400, "Note must have a title");
         }
 
         const newNote = await NoteModel.create({
             userId: authenticatedUserId,
-            title: title,
+            title: title.trim(),
             text: text,
         });
 
@@ -95,7 +95,7 @@ export const updateNote: RequestHandler<UpdateNoteParams, unknown, UpdateNoteBod
             throw createHttpError(400, "Invalid note id");
         }
 
-        if (!newTitle) {
+        if (typeof newTitle !== "string" || newTitle.trim().length === 0) {
             throw createHttpError(400, "Note must have a title");
         }
 
@@ -109,7 +109,7 @@ export const updateNote: RequestHandler<UpdateNoteParams, unknown, UpdateNoteBod
             throw createHttpError(401, "You cannot access this note");
         }
 
-        note.title = newTitle;
+        note.title = newTitle.trim();
         note.text = newText;
 
         const updatedNote = await note.save();
